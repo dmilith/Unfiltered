@@ -17,8 +17,8 @@ trait InittedFilter extends Filter {
   def destroy { }
 }
 
-class Plan(val filter: PartialFunction[ServletRequest, Handler]) extends InittedFilter {
-  val complete_filter = filter.orElse[ServletRequest, Handler] {
+class Plan(filter: PartialFunction[ServletRequest, Handler]) extends InittedFilter {
+  lazy val complete_filter = filter.orElse[ServletRequest, Handler] {
     case _ => Pass
   }
   def doFilter(request: ServletRequest, response: ServletResponse, chain: FilterChain) {
