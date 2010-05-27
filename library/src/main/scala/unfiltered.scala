@@ -13,7 +13,9 @@ trait InittedFilter extends Filter {
   def destroy { }
 }
 
-class Plan(val filter: PartialFunction[ServletRequest, ResponseFunction]) extends InittedFilter {
+/** To ecapsulate a filter in a class definition */
+trait Plan extends InittedFilter {
+  def filter: PartialFunction[ServletRequest, ResponseFunction]
   val complete_filter = filter.orElse[ServletRequest, ResponseFunction] {
     case _ => Pass
   }
@@ -27,3 +29,6 @@ class Plan(val filter: PartialFunction[ServletRequest, ResponseFunction]) extend
     }
   }
 }
+
+/** To define a filter with an independent function */
+class Planify(val filter: PartialFunction[ServletRequest, ResponseFunction]) extends Plan
