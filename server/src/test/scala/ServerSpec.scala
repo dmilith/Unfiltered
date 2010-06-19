@@ -15,13 +15,14 @@ object ServerSpec extends Specification {
   val server = unfiltered.server.Http(8083).filter(new TestPlan)
   val host = :/("localhost", 8083)
   
-  doBeforeSpec { server.daemonize }
+  doBeforeSpec { server.daemonize() }
   
   "A Server" should {
+    shareVariables()
     "respond to requests" in {
       Http(host as_str) must_=="test"
     }
   }
   
-  doAfterSpec { server.stop }
+  doAfterSpec { server.stop() }
 }

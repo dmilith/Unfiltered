@@ -18,9 +18,10 @@ object BasicAuthSpec extends Specification {
   val server = unfiltered.server.Http(8080).filter(new TestPlan)
   val host = :/("localhost", 8080)
   
-  doBeforeSpec { server.daemonize }
+  doBeforeSpec { server.daemonize() }
   
   "Basic Auth" should {
+    shareVariables()
     "authenticate a valid user" in {
       val resp = Http(host / "secret" as_!("test", "secret") as_str)
       resp must_=="pass"
@@ -31,5 +32,5 @@ object BasicAuthSpec extends Specification {
     }
   }
   
-  doAfterSpec { server.stop }
+  doAfterSpec { server.stop() }
 }

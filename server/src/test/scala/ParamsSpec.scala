@@ -23,9 +23,10 @@ object ParamsSpec extends Specification {
   val server = unfiltered.server.Http(8081).filter(new TestPlan)
   val host = :/("localhost", 8081)
   
-  doBeforeSpec { server.daemonize }
+  doBeforeSpec { server.daemonize() }
   
   "Params" should {
+    shareVariables()
     "extract query params" in {
       Http(host / "qp" <<? Map("foo" -> "bar") as_str) must_=="foo is bar"
     }
@@ -34,5 +35,5 @@ object ParamsSpec extends Specification {
     }
   }
   
-  doAfterSpec { server.stop }
+  doAfterSpec { server.stop() }
 }
