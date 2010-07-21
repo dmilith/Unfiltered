@@ -46,21 +46,6 @@ object ResponsePackage {
 
     /** ignore non-generating for loop */
     def foreach[U](f: A => U): Unit = { }
-
-    /** should responseFn's be filterable? */
-    def filter(f: A => Boolean) = this
-
-    /** Provides a delegate handler for calls to #withFilter */
-    class WithFilter(p: A => Boolean) {
-      //def map[B <: ResponseFunction](f: A => B) = self.filter(p).map(f)
-      def map[B <: ResponseFunction](f: A => ResponseMonad[B]) = self.filter(p).map(f)
-      def flatMap[B <: ResponseFunction](f: A => ResponseMonad[B]) = self.filter(p).flatMap(f)
-      def foreach[U](f: A => U): Unit = self.filter(p).foreach(f)
-      def withFilter(q: A => Boolean): WithFilter =
-        new WithFilter(x => p(x) && q(x))
-     }
-    /** Called with conditional statement provided in for comprehension */
-    def withFilter(p: A => Boolean): WithFilter = new WithFilter(p)
   }
 }
 import ResponsePackage._
