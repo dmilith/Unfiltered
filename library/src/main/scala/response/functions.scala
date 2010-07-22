@@ -23,6 +23,7 @@ object ResponsePackage {
   implicit def r2rm[R <: ResponseFunction](r: R): ResponseMonad[R] = 
     ResponseMonad(r, List[String]())
 
+
   case class ResponseMonad[A <: ResponseFunction](r: A, errors: List[String]) {
     self =>
  

@@ -24,6 +24,11 @@ object Params {
     def unapply(params: Map[String, Seq[String]]) = f(params(name)) map {
       (_, params)
     }
+    def apply(params: Map[String, Seq[String]]) =
+      f(params(name)) match {
+        case Some(param) => new FoundParameter(param)
+        case None => null // MissingParameter
+      }
   }
 
   class Chained[T, R](f: T => R) extends (T => R) {
