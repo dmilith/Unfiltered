@@ -14,39 +14,29 @@ object MonadicResponderSpec extends Specification with unfiltered.spec.Served {
   
   object Name extends Params.Named(
     "name", Params.first ~> Params.trimmed ~> Params.nonempty
-  ) { 
-    def apply(params: Map[String, Seq[String]]) = params match {
-      case Name(n, _) => Some(n)
-      case _ => None
-    }
-  }
+  )
   
   object Even extends Params.Named(
     "even", Params.first ~> Params.int ~> { _ filter { _ % 2 == 0 } }
-  ) { 
-    def apply(params: Map[String, Seq[String]]) = params match {
-      case Even(n, _) => Some(n)
-      case _ => None
-    }
-  }
+  )
   
   def setup = { _.filter(unfiltered.Planify {  
     case GET(UFPath("/multi", Params(p, _))) => 
       for {
-         name <- Name(p) withFail ("we need a name")
-         even <- Even(p) withFail ("no even number was supplied")
+         name <- Name(p)
+         even <- Even(p) orFail {
+           Status(400) ~> ResponseString(("sorry, no: " :: errors).mkString("\n"))
+         }
       } yield {
          ResponseString("we got %s and %s" format (name, even))
-      } orFail { errors: List[String] =>
-         Status(400) ~> ResponseString(("sorry, no: " :: errors).mkString("\n"))
       }
-    case GET(UFPath("/single", Params(p, _))) =>
+    /*case GET(UFPath("/single", Params(p, _))) =>
       for {
          name <- Name(p) orFail { ResponseString("we need a name") }
          even <- Even(p) orFail { ResponseString("no even number was supplied") }
       } yield {
          ResponseString("we got %s and %s" format (name, even))
-      }
+      }*/
   })}
   
   "Monadic responders" should {
