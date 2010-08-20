@@ -3,6 +3,7 @@ package unfiltered.request
 import unfiltered.response.ResponsePackage.ResponseFunction
 import javax.servlet.http.HttpServletRequest
 
+/** Basic parameter acess, and a pattern matching extractor in Extract. */
 object Params {
   /** Dress a Java Enumeration in Scala Iterator clothing */
   case class JEnumerationIterator[T](e: java.util.Enumeration[T]) extends Iterator[T] {
@@ -49,20 +50,32 @@ object Params {
   def int(os: Option[String]) = 
     try { os map { _.toInt } } catch { case _ => None }
 
-  val even = pred((_:Int) % 2 == 0)
-  val odd = pred((_:Int) % 2 == 1)
+  val even = pred { (_:Int) % 2 == 0 }
+  val odd = pred { (_:Int) % 2 == 1 }
+
+  def trimmed(s: Option[String]) = s map { _.trim }
+  val nonempty = pred { !(_:String).isEmpty }
 }
 
+/** Fined-grained error reporting for arbitrarily many failing parameters.
+ * Import QParams._ to use; see ParamsSpec for examples. */
 object QParams {
   type Log[E] = List[(String,E)]
   type QueryFn[E,A] = (Params.Map, Option[String], Log[E]) =>
     (Option[String], Log[E], A)
   type QueryResult[E,A] = Either[Log[E], A]
+  /** Left if the query has failed, right if it has not (but may be empty) */
+  type Report[E,A] = Either[E,Option[A]]
+  type Reporter[E,A,B] = Option[A] => Report[E,B]
 
-  /* Implicitly provide 'orElse' for QueryResult (either) type. */
+
+  /* Implicitly provide 'orFail' for QueryResult (either) type. */
   case class QueryResultX[E,A](r: QueryResult[E,A]) {
-    def orElse[B >: A](handler: Log[E] => B) =
-      r.left.map(handler).merge
+    def orFail[B >: A](handler: Log[E] => B) =
+      r.left.map(handler) match { // i.e. .merge, in 2.8
+        case Left(v) => v
+        case Right(v) => v
+      }
   }
   implicit def queryOrElse[E,A](r: QueryResult[E,A]): QueryResultX[E,A] =
     QueryResultX(r)
@@ -94,7 +107,7 @@ object QParams {
       }
 
     /* Combinator for filtering the value and tagging errors. */
-    def is[B](f: A => Either[E,Option[B]]): QueryM[E,Option[B]] =
+    def is[B](f: A => Report[E,B]): QueryM[E,Option[B]] =
       QueryM {
         (params, key0, log0) =>
           val (key1, log1, value) = exec(params, key0, log0)
@@ -111,44 +124,38 @@ object QParams {
     def apply(params: Params.Map) = exec(params, None, Nil)._3
   }
 
-  def all[E](key: String): QueryM[E,Seq[String]] =
-    QueryM {
-      (params, _, log0) =>
-        (Some(key), log0, params.getOrElse(key, Seq()))
-    }
-
-  def first[E](key: String): QueryM[E,Option[String]] =
+  def lookup[E](key: String): QueryM[E,Option[String]] =
     QueryM {
       (params, _, log0) =>
         (Some(key), log0, params.get(key).flatMap { _.firstOption })
     }
 
   /* Functions that are useful arguments to QueryM.is */
-  def required[E,A](err:E)(xs: Option[A]): Either[E,Option[A]] = 
-    xs match {
-      case None => Left(err)
-      case oa => Right(oa)
-    }
-
-  def forbidden(xs: Seq[String]): Option[Unit] =
-    if(xs.length == 0) Some(())
-    else None
-
-  def optional[E,A](xs: Option[A]): Either[E,Option[Option[A]]] =
-    Right(Some(xs))
-
-  def conv[E,A,B](c: Option[A] => Option[B], err: E): Option[A] => Either[E,Option[B]] = {
-    case None => Right(None)
-    case oa => c(oa) match {
-      case None => Left(err)
-      case ob => Right(ob)
-    }
+  def required[E,A](err:E): Reporter[E,A,A] = {
+    case None => Left(err)
+    case oa => Right(oa)
   }
 
-  def pred[E,A](p: A => Boolean)(err: E): Option[A] => Either[E,Option[A]] =
-    conv({_ filter p}, err)
+  def optional[E,A](xs: Option[A]): Report[E,Option[A]] =
+    Right(Some(xs))
 
-  def int[E](e: E) = conv(Params.int, e)
-  def even[E](e: E) = conv(Params.even, e)
-  def odd[E](e: E) = conv(Params.odd, e)
+  /** Promote c to an error reporter that fails if Some input is discarded */
+  def watch[E,A,B](c: Option[A] => Option[B], err: E): Reporter[E,A,B] = {
+    case None => Right(None)
+    case oa => c(oa).map { b => Right(Some(b)) } getOrElse Left(err)
+  }
+
+  /** Convert a predicate into an error reporter */
+  def pred[E,A](p: A => Boolean)(err: E): Reporter[E,A,A] =
+    watch({_ filter p}, err)
+
+  /** Convert f into an error reporter that never reports errors */
+  def ignore[E,A](f: Option[A] => Option[A]): Reporter[E,A,A] = 
+    opt => Right(f(opt))
+
+  def int[E](e: E) = watch(Params.int, e)
+  def even[E](e: E) = watch(Params.even, e)
+  def odd[E](e: E) = watch(Params.odd, e)
+  def trimmed[E] = ignore[E,String](Params.trimmed)
+  def nonempty[E](e: E) = watch(Params.nonempty, e)
 }
