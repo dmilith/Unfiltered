@@ -9,7 +9,8 @@ import org.eclipse.jetty.util.resource.Resource
 import java.util.concurrent.atomic.AtomicInteger
 
 case class Http(port: Int, host: String) extends Server {
-  def this(port: Int) = this(port, "0.0.0.0")
+  /** use the factory method */
+  @deprecated def this(port: Int) = this(port, "0.0.0.0")
   val url = "http://%s:%d/" format (host, port)
   val conn = new SocketConnector()
   conn.setPort(port)
@@ -35,16 +36,24 @@ trait ContextBuilder {
     current.setBaseResource(Resource.newResource(path))
     this
   }
-
 }
 
-trait Server extends ContextBuilder {
+object Http {
+  /** bind to the given port for any host */
+  def apply(port: Int): Http = Http(port, "0.0.0.0")
+  /** bind to a the loopback interface only */
+  def local(port: Int) = Http(port, "127.0.0.1")
+  /** bind to any available port on the loopback interface */
+  def anylocal = local(unfiltered.util.Port.any)
+}
+
+trait Server extends ContextBuilder with unfiltered.util.RunnableServer { self =>
   val underlying = new JettyServer()
   val handlers = new ContextHandlerCollection
   val counter = new AtomicInteger
   
   underlying.setHandler(handlers)
-  
+
   private def contextHandler(path: String) = {
     val ctx = new ServletContextHandler(handlers, path, false, false)
     val holder = new ServletHolder(classOf[org.eclipse.jetty.servlet.DefaultServlet])
@@ -63,39 +72,9 @@ trait Server extends ContextBuilder {
   }
   lazy val current = contextHandler("/")
   
-  /** Calls run with a no-op afterStart */
-  def run() {
-    run { _ => () }
-  }
-  /** Starts the server, calls andThen, and joins the server's controlling thread. If the
-   * current thread is not the main thread, e.g. if running in sbt, waits for input in a
-   * loop and stops the server as soon as any key is pressed. In either case the server
-   * instance is destroyed after being stopped. */
-  def run(afterStart: this.type => Unit) {
-    // enter wait loop if not in main thread, e.g. running inside sbt
-    Thread.currentThread.getName match {
-      case "main" => 
-        underlying.setStopAtShutdown(true)
-        underlying.start()
-        afterStart(Server.this)
-        underlying.join()
-        destroy()
-      case _ => 
-        underlying.start()
-        afterStart(Server.this)
-        println("Embedded server running. Press any key to stop.")
-        def doWait() {
-          try { Thread.sleep(1000) } catch { case _: InterruptedException => () }
-          if(System.in.available() <= 0)
-            doWait()
-        }
-        doWait()
-        stop()
-        destroy()
-    }
-  }
   /** Starts server in the background */
   def start() = {
+    underlying.setStopAtShutdown(true)
     underlying.start()
     Server.this
   }
@@ -107,7 +86,12 @@ trait Server extends ContextBuilder {
   /** Destroys the Jetty server instance and frees its resources.
    * Call after stopping a server, if finished with the instance,
    * to help avoid PermGen errors in an ongoing JVM session. */
-  def destroy() {
+  def destroy() = {
     underlying.destroy()
+    this
+  }
+  def join() = {
+    underlying.join()
+    this
   }
 }

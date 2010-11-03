@@ -1,5 +1,6 @@
 package unfiltered.netty
 
+import unfiltered.util.RunnableServer
 import java.util.concurrent.Executors
 import org.jboss.netty.bootstrap.ServerBootstrap
 import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory
@@ -8,8 +9,11 @@ import org.jboss.netty.handler.codec.http.{HttpRequestDecoder, HttpResponseEncod
 import org.jboss.netty.channel._
 import group.{ChannelGroup, DefaultChannelGroup}
 
-class Server(val port: Int, host: String, val lastHandler: ChannelHandler) {
-  def this(port: Int, lastHandler: ChannelHandler) = this(port, "0.0.0.0", lastHandler)
+trait Server extends RunnableServer {
+  val port: Int
+  val host: String
+  protected def pipelineFactory: ChannelPipelineFactory
+
   val DEFAULT_IO_THREADS = Runtime.getRuntime().availableProcessors() + 1;
   val DEFAULT_EVENT_THREADS = DEFAULT_IO_THREADS * 4;
   
@@ -17,12 +21,8 @@ class Server(val port: Int, host: String, val lastHandler: ChannelHandler) {
   
   /** any channels added to this will receive broadcasted events */
   protected val channels = new DefaultChannelGroup("Netty Unfiltered Server Channel Group")
-  
-  /** override this to provide an alternative pipeline factory */
-  protected lazy val pipelineFactory: ChannelPipelineFactory = new ServerPipelineFactory(channels, lastHandler)
 
-  def start() = {
-
+  def start(): this.type = {
     bootstrap = new ServerBootstrap(
       new NioServerSocketChannelFactory(
         Executors.newFixedThreadPool(DEFAULT_IO_THREADS),
@@ -37,24 +37,54 @@ class Server(val port: Int, host: String, val lastHandler: ChannelHandler) {
     bootstrap.setOption("reuseAddress", true)
     bootstrap.setOption("backlog", 16384)
     channels.add(bootstrap.bind(new InetSocketAddress(host, port)))
+    this
   }
 
-  def stop() = {
+  def closeConnections(): this.type = {
     // Close any pending connections / channels (including server)
     channels.close.awaitUninterruptibly
+    this
+  }
+  def destroy(): this.type = {
     // Release NIO resources to the OS
     bootstrap.releaseExternalResources
+    this
   }
 }
 
-class ServerPipelineFactory(channels: ChannelGroup, lastHandler: ChannelHandler) extends ChannelPipelineFactory {
+/** Default implementation of the Server trait. If you want to use a custom pipeline
+ * factory it's better to extend Server directly. */
+case class Http(port: Int, host: String,
+                handlers: List[ChannelHandler],
+                beforeStopBlock: () => Unit) extends Server with RunnableServer {
+  def pipelineFactory = new ServerPipelineFactory(channels, handlers)
+  def stop() = {
+    beforeStopBlock()
+    closeConnections()
+    destroy()
+  }
+  def handler(h: ChannelHandler) = 
+    Http(port, host, h :: handlers, beforeStopBlock)
+  def beforeStop(block: => Unit) =
+    Http(port, host, handlers, { () => beforeStopBlock(); block })
+}
+
+object Http {
+  def apply(port: Int, host: String): Http = 
+    Http(port, host, Nil, () => ())
+  def apply(port: Int): Http = 
+    Http(port, "0.0.0.0")
+}
+
+class ServerPipelineFactory(channels: ChannelGroup, handlers: List[ChannelHandler]) 
+    extends ChannelPipelineFactory {
   def getPipeline(): ChannelPipeline = {
     val line = Channels.pipeline
 
     line.addLast("housekeeping", new HouseKeepingChannelHandler(channels))
     line.addLast("decoder", new HttpRequestDecoder)
     line.addLast("encoder", new HttpResponseEncoder)
-    line.addLast("handler", lastHandler)
+    handlers.reverse.foreach { h => line.addLast("handler", h) }
 
     line
   }
