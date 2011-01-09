@@ -29,7 +29,7 @@ private [netty] class RequestBinding(msg: ReceivedMessage) extends HttpRequest(m
     case _ => Map.empty[String,Seq[String]]
   }
   def postParams = this match {
-    case POST(RequestContentType(ct, _)) if ct.contains("application/x-www-form-urlencoded") =>
+    case POST(RequestContentType(ct)) if ct.contains("application/x-www-form-urlencoded") =>
       URLParser.urldecode(req.getContent.toString(JNIOCharset.forName(charset)))
     case _ => Map.empty[String,Seq[String]]
   }
@@ -71,6 +71,11 @@ private [netty] class RequestBinding(msg: ReceivedMessage) extends HttpRequest(m
       Nil
     }
   }
+  def isSecure = msg.context.getPipeline.get(classOf[org.jboss.netty.handler.ssl.SslHandler]) match {
+    case null => false
+    case _ => true
+  }
+  def remoteAddr = msg.context.getChannel.getRemoteAddress.asInstanceOf[java.net.InetSocketAddress].getAddress.getHostAddress
 }
 /** Extension of basic request binding to expose Netty-specific attributes */
 case class ReceivedMessage(

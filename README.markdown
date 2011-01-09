@@ -143,7 +143,7 @@ A minimal server websocket interface build on netty
 
 Unfiltered is a [cross built](http://code.google.com/p/simple-build-tool/wiki/CrossBuild) project, currently for the following Scala versions
 
-    2.7.7, 2.8.0, 2.8.1.RC1
+    2.7.7, 2.8.0, 2.8.1
     
 ### via sbt
 
@@ -152,15 +152,15 @@ binding module:
 
     import sbt._
     class Project(info) extends DefaultProject(info) {
-      val uf = "net.databinder" %% "unfiltered-jetty" % "0.2.2"
-      val uf = "net.databinder" %% "unfiltered-filter" % "0.2.2"
+      val uf = "net.databinder" %% "unfiltered-jetty" % "0.2.3"
+      val uf = "net.databinder" %% "unfiltered-filter" % "0.2.3"
     }
     
 To specify individual modules, specify the module name in the dependency.
 
     import sbt._
     class Project(info) extends DefaultProject(info) {
-      val ufx = "net.databinder" %% "unfiltered-{module}" % "0.2.2"
+      val ufx = "net.databinder" %% "unfiltered-{module}" % "0.2.3"
     }
     
 See the [template](http://github.com/n8han/Unfiltered/tree/master/demo/) application for an example of a basic Unfiltered application.
