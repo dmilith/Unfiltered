@@ -1,6 +1,6 @@
 # Unfiltered
 
-Unfiltered embraces the HTTP protocol, Scala, type-safety, and minimalism. It enables applications to handle HTTP requests as partially applied functions that take requests and return functions to respond to them. Typically, applications [pattern-match](http://en.wikipedia.org/wiki/Pattern_matching) requests against nested extractor objects. HTTP responses are defined with response [combinator functions](http://en.wikipedia.org/wiki/Combinatory_logic).
+Unfiltered embraces the HTTP protocol, Scala, type-safety, and minimalism. It enables applications to handle HTTP requests as partial functions that take requests and return functions to respond to them. Typically, applications [pattern-match](http://en.wikipedia.org/wiki/Pattern_matching) requests against nested extractor objects. HTTP responses are defined with response [combinator functions](http://en.wikipedia.org/wiki/Combinatory_logic).
 
 The request response cycle reduces to a pattern matching clause similar to message handling in the Scala [actors](http://www.scala-lang.org/node/242) library.
 
@@ -26,7 +26,7 @@ Intent functions pattern match against incoming requests and return a function t
 
 Plans assign an Intent to particular request and response
 bindings. For example, the trait `unfiltered.filter.Plan` defines a
-`javax.servlet.Filter` that delegates to its`intent` method. The class `unfiltered.netty.Plan` defines a channel handler similarly. A future Plan trait might define a Servlet. Plan is a convention (and not currently a common interface) to apply an Intent to any request handling framework.
+`javax.servlet.Filter` that delegates to its`intent` method. The class `unfiltered.netty.cycle.Plan` defines a channel handler similarly. A future Plan trait might define a Servlet. Plan is a convention (and not currently a common interface) to apply an Intent to any request handling framework.
 
 ## Request Extractors
 
@@ -151,16 +151,16 @@ For standalone projects,  you'll want `unfiltered-jetty` as well as a
 binding module:
 
     import sbt._
-    class Project(info) extends DefaultProject(info) {
-      val uf = "net.databinder" %% "unfiltered-jetty" % "0.2.3"
-      val uf = "net.databinder" %% "unfiltered-filter" % "0.2.3"
+    class Project(info:ProjectInfo) extends DefaultProject(info) {
+      val ufj = "net.databinder" %% "unfiltered-jetty" % "0.3.0"
+      val uff = "net.databinder" %% "unfiltered-filter" % "0.3.0"
     }
     
 To specify individual modules, specify the module name in the dependency.
 
     import sbt._
-    class Project(info) extends DefaultProject(info) {
-      val ufx = "net.databinder" %% "unfiltered-{module}" % "0.2.3"
+    class Project(info:ProjectInfo) extends DefaultProject(info) {
+      val ufx = "net.databinder" %% "unfiltered-{module}" % "0.3.0"
     }
     
 See the [template](http://github.com/n8han/Unfiltered/tree/master/demo/) application for an example of a basic Unfiltered application.
@@ -173,7 +173,7 @@ Join the [Unfiltered mailing list on Nabble](http://databinder.3617998.n2.nabble
 
 ### overly complex extractors 
     
-If you design your partially applied functions in such a way that they become overly complex you might run into the following exception
+If you design your partial functions in such a way that they become overly complex you might run into the following exception
     
     Exception in thread "main" java.lang.Error: ch.epfl.lamp.fjbg.JCode$OffsetTooBigException: offset to
     o big to fit in 16 bits
